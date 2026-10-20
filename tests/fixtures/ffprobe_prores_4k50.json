@@ -1,0 +1,12 @@
+{
+  "streams": [
+    {"index": 0, "codec_type": "video", "codec_name": "prores", "profile": "HQ", "codec_tag_string": "apch",
+     "width": 4096, "height": 2160, "pix_fmt": "yuv422p10le", "sample_aspect_ratio": "1:1", "r_frame_rate": "50/1",
+     "avg_frame_rate": "50/1", "nb_frames": "1732", "duration_ts": 443392, "time_base": "1/12800",
+     "tags": {"handler_name": "VideoHandler", "timecode": "10:14:22:31"}},
+    {"index": 1, "codec_type": "data", "codec_tag_string": "tmcd", "nb_frames": "1",
+     "tags": {"handler_name": "TimeCodeHandler", "timecode": "10:14:22:31"}}
+  ],
+  "format": {"filename": "/Volumes/RAID/OCF/A001_1012AB/A001_C003_1012AB.RDC/A001_C003_1012AB_001.mov",
+             "tags": {"major_brand": "qt  "}}
+}

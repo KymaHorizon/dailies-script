@@ -1,0 +1,49 @@
+{
+  "audio_channels": 4,
+  "fps": 25,
+  "frames": 711,
+  "height": 2592,
+  "metadata": {
+    "anamorphic_mode": 0,
+    "camera_id": "A",
+    "camera_model": "V-RAPTOR 8K VV",
+    "camera_position": "C",
+    "clip_id": "003",
+    "dropped_frame_count": 0,
+    "framerate": 25,
+    "framerate_denominator": 1000,
+    "framerate_numerator": 25000,
+    "image_height": 2592,
+    "image_width": 6144,
+    "iso": 800,
+    "original_filename": "A001_C003_0428HT_001.R3D",
+    "pixel_aspect_ratio": 1,
+    "record_framerate": 25,
+    "record_framerate_denominator": 1001,
+    "record_framerate_numerator": 25025,
+    "reel_id": "001",
+    "reel_id_8_character": "A001C003",
+    "reel_id_full": "A001_C003_0428HT",
+    "resolution_format_name": "6K 2.4:1",
+    "sensor_name": "V-RAPTOR VV",
+    "start_absolute_timecode": "00:00:44:18",
+    "start_edge_timecode": "01:00:30:20",
+    "user_timecode_preference": 1,
+    "white_balance_kelvin": 4500,
+    "white_balance_tint": -30
+  },
+  "path": "/Volumes/RAID/CAMERA/A001_04289Y.RDM/A001_C003_0428HT.RDC/A001_C003_0428HT_001.R3D",
+  "tc_absolute": [
+    "00:00:44:18",
+    "00:01:13:03"
+  ],
+  "tc_default": [
+    "00:00:44:18",
+    "00:01:13:03"
+  ],
+  "tc_edge": [
+    "01:00:30:20",
+    "01:00:59:05"
+  ],
+  "width": 6144
+}

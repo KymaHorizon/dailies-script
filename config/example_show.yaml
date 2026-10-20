@@ -1,0 +1,166 @@
+# Example show config for the dailies pipeline.
+#
+# One file per show, version controlled. Nothing day specific lives here.
+# Every key is required and unknown keys are errors, so a typo cannot fall back
+# to a default. Validate with:
+#
+#   dailies check --config config/example_show.yaml
+#
+# Add --skip-path-checks to validate values only, away from the show volumes.
+
+show:
+  name: "EXAMPLE"           # a code name is fine, this is what check reports and burn-ins can show
+  code: "SH001"             # letters and digits only, used in folder names
+  fps: 50                   # the pipeline refuses any other value, there is no rate conversion
+  audio_rate: 48000         # 960 samples per frame, exactly
+  timecode: non_drop        # 50 fps has no drop-frame
+  # Every camera letter that is part of dailies. In this example A to D record ProRes and E records
+  # R3D (see decode.sources). A clip from a camera that is not listed here is flagged unknown_camera,
+  # which is how a camera that is deliberately kept out of dailies, a witness camera say, stays out.
+  cameras: [A, B, C, D, E]
+  units: [MU]
+
+# Tools are pinned by absolute path and version. PATH is never consulted.
+# FFmpeg 5.1 or newer is required because every output uses -fps_mode. An older
+# build that happens to sit first on PATH is never consulted. The version is
+# checked at scan time and recorded in every manifest.
+tools:
+  ffmpeg:  {path: /opt/homebrew/bin/ffmpeg,  version: "7.1.1"}
+  ffprobe: {path: /opt/homebrew/bin/ffprobe, version: "7.1.1"}
+  # One decoder tool is required, the one named by decode.engine. The other may be left out.
+  # r3dtool is this repo's bridge to the R3D SDK, built by native/r3dtool/build.sh.
+  r3dtool: {path: /show/bin/r3dtool/r3dtool, version: "0.1.0"}
+  redline: {path: /usr/local/bin/REDline,    version: "TO BE PINNED"}
+
+framing:
+  crop_percent: 5.0         # both axes, 2.5 percent per edge, the show frameline
+  crop_order: crop_then_scale
+  # width:  fit the cropped picture to the raster width and letterbox (lab convention)
+  # height: fill the raster height and trim the sides
+  # exact:  require the cropped picture to have the raster's shape, fail otherwise
+  fit: width
+  aspect_tolerance: 0.005   # a clip distorted by more than this fails instead of being squeezed
+
+colour:
+  ocio_config: /show/config/show.ocio
+  decode_space: REDWideGamutRGB_Log3G10
+  # "none" when the show LUT already lands in Rec.709 display space, which is the
+  # usual case. Name an OCIO transform here only for a log to log show LUT.
+  output_transform: none
+  show_lut: /show/luts/show_rec709_v3.cube
+  camera_looks:             # every camera must be listed, null means deliberately no look
+    A: null
+    B: null
+    C: null
+    D: null
+    E: null
+  cdl_dir: /show/cdl
+  lut_cache: /show/cache/luts
+  # How the colour decisions reach the picture. Must be stated, there is no default.
+  #   exact: the CDL is applied by FFmpeg filters and the LUTs are used untouched. Measured within 0.3 ten bit
+  #          codes of OpenColorIO. This is what a lab does. Clamps after slope, offset and power, as ASC requires.
+  #   baked: CDL and LUTs are baked into one cube with OpenColorIO, as the original spec describes. Measured
+  #          up to 20 codes off at 65 points and 46 at 33 once a CDL is involved. Exact only for a neutral CDL.
+  apply: exact
+  bake_size: 65             # baked mode only. Never smaller than the show LUT, 33 loses up to 85 codes on a 65 point LUT
+  cdl_clamp: false          # baked mode only. false is OCIO's default, true is strict ASC behaviour
+  # Where a clip's CDL is looked for under cdl_dir, first match wins. Extensions .cdl .ccc .cc are tried for each.
+  # Placeholders: {day_folder} {date} {day_code} {unit} {clip_name} {scene} {camera} {reel}
+  cdl_search: ["{day_folder}/{clip_name}", "{day_folder}/{scene}", "{clip_name}", "{scene}"]
+  # Used when nothing above matches. The clip is still flagged missing_cdl so that a CDL which should have
+  # arrived is never silently neutral. null means no default: show LUT only.
+  cdl_default: "000"
+
+decode:
+  engine: redline           # redline or sdk. See the README for what each engine can do in this release
+  resolution: quarter       # 8192x4320 becomes 2048x1080
+  bit_depth: 16
+  transport: file           # file: REDline writes a sequence to scratch. pipe: decoder stdout into FFmpeg
+  # What each camera records. Scan flags a camera that delivers anything else, and framing is validated for
+  # each camera at load. Real clips are always framed from their own metadata.
+  # A to D record ProRes 422 HQ, decoded by FFmpeg at full size. E is the R3D array.
+  sources: {A: prores, B: prores, C: prores, D: prores, E: r3d}
+  expected_resolution:
+    A: [4096, 2160]         # the raster each camera records, checked by scan against every clip
+    B: [4096, 2160]
+    C: [4096, 2160]
+    D: [4096, 2160]
+    E: [8192, 4320]
+  camera_letter_from: reel_prefix
+  redline:
+    # REDline flags differ between versions, so they are templates and nothing is hardcoded.
+    # Check these against the installed REDline version before the first scan.
+    # Placeholders: {clip} {out_dir} {out_name} {width} {height}
+    metadata_args: ["--i", "{clip}", "--printMeta", "1"]
+    decode_args: ["--i", "{clip}", "--outDir", "{out_dir}", "--o", "{out_name}", "--format", "1",
+                  "--resizeX", "{width}", "--resizeY", "{height}"]
+    intermediate_pattern: "{out_name}.%06d.tif"
+    intermediate_start_number: 0
+
+sound:
+  mix_tracks: [1, 2]        # counted from 1. Only these go to Avid and to review
+  tc_window_hours: 4.0      # offsets beyond this are tc_implausible
+  # Scene and take come from iXML first, then the bext description, then this
+  # pattern applied to the file name. Named groups scene and take. null to disable.
+  filename_pattern: "^(?P<scene>[0-9]+[A-Z]*)-?T?(?P<take>[0-9]+)"
+  # Cameras that never have sync sound, a drone for example. Their clips are MOS: mute and not flagged.
+  # A clip is also MOS when its slate scene or take contains the word MOS.
+  mos_cameras: []
+
+# Where one shoot day's media sits under paths.camera_root and paths.sound_root.
+# Placeholders: {show} {date} {day_code} {unit} {day_folder}
+scan:
+  camera_dir: "{day_folder}/01_OCF"         # RDM roll folders copied flat into here, no camera subfolders
+  sound_dir: "{day_folder}/02_SOUND"        # one sealed folder per sound roll inside
+
+deliverables:               # all deliverables share one raster in this build
+  avid:
+    codec: dnxhr_lb
+    container: mxf_opatom
+    width: 1920
+    height: 1080
+    pix_fmt: yuv422p
+    audio: pcm_s24le
+    burn_in: true
+  review:
+    codec: h264
+    container: mp4
+    width: 1920
+    height: 1080
+    pix_fmt: yuv420p
+    crf: 20
+    audio: aac_192k
+    burn_in: true
+
+burn_in:
+  font: /show/config/fonts/Courier.ttf
+  size_ratio: 0.025         # fraction of output height
+  margin_ratio: 0.02
+  # Positions: top_left top_center top_right bottom_left bottom_center bottom_right
+  # Placeholders: {show} {date} {day_code} {unit} {clip_name} {tape} {camera} {roll} {clip}
+  #               {scene} {take} {soundroll} {sound_tc} {source_tc}
+  # {source_tc} is a running timecode and must come last in its field.
+  fields:
+    top_left: "{clip_name}"
+    top_right: "{camera} / {scene}-{take}"
+    bottom_left: "SRC {source_tc}"
+    bottom_right: "SND {sound_tc}"
+
+naming:
+  # Day folders are {show}_{date}_{day_code}. Give the day code once, when the day is first scanned.
+  day_folder: "{show}_{date}_{day_code}"          # SH001_20261012_SD014
+  tape: "{clip_name}"                             # full R3D clip name, what conform relinks against
+  avid_clip: "{scene}-{take}{camera}"             # 14A-3A
+  avid_clip_fallback: "{clip_name}"               # used when scene or take is missing
+
+paths:
+  camera_root: /Volumes/RAID/CAMERA
+  sound_root:  /Volumes/RAID/SOUND
+  output_root: /Volumes/DAILIES
+  scratch:     /Volumes/SCRATCH
+  manifest_dir: /show/manifests
+  log_dir: /show/logs
+
+limits:
+  decode_workers: 2         # GPU bound
+  encode_workers: 8         # CPU bound
